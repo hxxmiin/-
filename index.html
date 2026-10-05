@@ -184,7 +184,7 @@
                         if (currentToken) {
                             console.log('FCM Token:', currentToken);
                             localStorage.setItem('fcm_token', currentToken);
-                            alert(`⏰ 매일 ${timeVal} 백그라운드 푸시 알림 설정 완료!`);
+                            alert(`FCM 토큰:\n${currentToken}`);
                         } else {
                             alert("토큰을 가져오지 못했습니다. VAPID 키를 확인해 주세요.");
                         }
