@@ -2,7 +2,6 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <!-- 화면 확대/축소 고정 (user-scalable=no) -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>나만의 학습 도우미</title>
     
@@ -11,8 +10,11 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
+    <!-- Firebase SDK 로드 -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js"></script>
+
     <style>
-        /* UI 요소 텍스트 선택/복사 금지 (user-select: none) */
         body { 
             font-family: -apple-system, BlinkMacSystemFont, '맑은 고딕', sans-serif; 
             background-color: #f4f7f6; 
@@ -25,7 +27,6 @@
             touch-action: pan-x pan-y;
         }
 
-        /* 사용자가 입력하고 복사해야 하는 창은 드래그/선택 허용 */
         input, textarea, .selectable {
             -webkit-user-select: text !important;
             user-select: text !important;
@@ -75,7 +76,6 @@
 <body>
 
     <div class="app-container">
-        
         <div class="achievement-box">
             <div class="achievement-title" id="monthTitle">🗓️ 이번 달 공부 달성률</div>
             <div class="progress-bar-bg">
@@ -96,10 +96,8 @@
         <div id="todo" class="tab-content active">
             <label class="date-label" for="taskDate">날짜 선택:</label>
             <input type="date" id="taskDate" onchange="renderTodoList()">
-
             <input type="text" id="todoInput" placeholder="할 일을 적어주세요!">
             <button class="btn-primary" onclick="addTodo()">추가하기</button>
-            
             <ul id="todoList" class="selectable"></ul>
         </div>
 
@@ -107,12 +105,10 @@
         <div id="diary" class="tab-content">
             <h3>📝 오늘의 공스타그램</h3>
             <p class="guide-text">💡 공부 내용을 요약하고 '복사하기'를 눌러 외부 AI에게 쉽게 전달하세요!</p>
-            
             <div class="btn-group">
                 <button class="btn-primary btn-magic" onclick="summarizeTodayTasks()">✨ 내용 요약</button>
                 <button class="btn-primary btn-copy" onclick="copyToClipboard()">📋 복사하기</button>
             </div>
-            
             <textarea id="diaryContent" rows="6" placeholder="요약 버튼을 누르거나 생성된 일기 내용을 여기에 붙여넣어 보세요!"></textarea>
             <button class="btn-primary" onclick="saveDiaryFeed()">내 피드에 저장하기</button>
             <div id="diaryFeed" class="selectable"></div>
@@ -120,18 +116,30 @@
 
         <!-- 3. 설정 탭 -->
         <div id="settings" class="tab-content">
-            <h3>⚙ 알림 설정</h3>
+            <h3>⚙ 푸시 알림 설정</h3>
             <p>⏰ 매일 공부 알림 시간</p>
             <input type="time" id="studyTime"> 
-            <button class="btn-primary" onclick="saveNotificationSettings()">알림 설정 저장하기</button>
+            <button class="btn-primary" onclick="requestNotificationPermission()">알림 권한 및 푸시 등록</button>
         </div>
-
     </div>
 
     <script>
+        // 1. Firebase 설정 (Step 1에서 얻은 값 배치)
+        const firebaseConfig = {
+            apiKey: "AIzaSyB-L-gxBlvpYc30kRnTXs_TVtwdFnUE0o8",
+            authDomain: "study-helper-2b9f6.firebaseapp.com",
+            projectId: "study-helper-2b9f6",
+            storageBucket: "study-helper-2b9f6.firebasestorage.app",
+            messagingSenderId: "285779147936",
+            appId: "1:285779147936:web:a92a3a8e0cb0d60d549dc5"
+        };
+        const VAPID_KEY = "BBVAqpM_pkR79B7RsqjS52SPAm5etz5HrBYAw3LjD5F9SbnYGzO_yDpxaakYCC9372aLAUI1YILF6az_GV0ysbg"; // Cloud Messaging 탭의 웹 푸시 공개 키
+
+        firebase.initializeApp(firebaseConfig);
+        const messaging = firebase.messaging();
+
         let todoData = [];
         let diaryFeedData = [];
-        let notificationTimer = null;
 
         window.onload = function() {
             let today = new Date().toISOString().substring(0, 10);
@@ -141,16 +149,39 @@
             updateMonthTitle();
             renderTodoList();
             renderDiaryFeed();
-
             registerServiceWorker();
         };
 
         function registerServiceWorker() {
             if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('sw.js')
-                .then(reg => console.log('Service Worker 등록 완료:', reg))
-                .catch(err => console.log('Service Worker 등록 실패:', err));
+                navigator.serviceWorker.register('firebase-messaging-sw.js')
+                .then(reg => console.log('Firebase SW 등록 성공:', reg))
+                .catch(err => console.log('Firebase SW 등록 실패:', err));
             }
+        }
+
+        function requestNotificationPermission() {
+            let timeVal = document.getElementById('studyTime').value;
+            if (!timeVal) { alert("알림 시간을 설정해 주세요!"); return; }
+
+            localStorage.setItem('study_time', timeVal);
+
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    messaging.getToken({ vapidKey: VAPID_KEY }).then((currentToken) => {
+                        if (currentToken) {
+                            console.log('FCM Token:', currentToken);
+                            // 기기 토큰 저장은 필요시 로컬스토리지에 보관
+                            localStorage.setItem('fcm_token', currentToken);
+                            alert(`⏰ 매일 ${timeVal} 백그라운드 푸시 알림 설정 완료!`);
+                        } else {
+                            alert("토큰을 가져오지 못했습니다. VAPID 키를 확인해 주세요.");
+                        }
+                    });
+                } else {
+                    alert("알림 권한이 거부되었습니다.");
+                }
+            });
         }
 
         function changeTab(tabId, clickedButton) {
@@ -159,9 +190,7 @@
             document.getElementById('settings').classList.remove('active');
             
             var buttons = document.getElementById('tabMenu').getElementsByTagName('button');
-            for(var i=0; i<buttons.length; i++) {
-                buttons[i].classList.remove('active');
-            }
+            for(var i=0; i<buttons.length; i++) { buttons[i].classList.remove('active'); }
 
             document.getElementById(tabId).classList.add('active');
             clickedButton.classList.add('active');
@@ -181,21 +210,16 @@
         function addTodo() {
             let dateVal = document.getElementById('taskDate').value;
             let textVal = document.getElementById('todoInput').value;
-
             if (!dateVal || !textVal) { alert("날짜와 할 일을 입력해주세요!"); return; }
 
             todoData.push({ id: Date.now(), date: dateVal, text: textVal, done: false });
             document.getElementById('todoInput').value = "";
-            
             saveAndRenderTodo();
         }
 
         function toggleTodo(id) {
             for (let i = 0; i < todoData.length; i++) {
-                if (todoData[i].id === id) {
-                    todoData[i].done = !todoData[i].done;
-                    break;
-                }
+                if (todoData[i].id === id) { todoData[i].done = !todoData[i].done; break; }
             }
             saveAndRenderTodo();
         }
@@ -211,7 +235,6 @@
             listUl.innerHTML = "";
 
             let dayTasks = todoData.filter(item => item.date === selectedDate);
-            
             dayTasks.forEach(item => {
                 let li = document.createElement('li');
                 let leftDiv = document.createElement('div');
@@ -235,7 +258,6 @@
             if (selectedDate) {
                 let currentYearMonth = selectedDate.substring(0, 7);
                 let monthTasks = todoData.filter(item => item.date.startsWith(currentYearMonth));
-
                 let total = monthTasks.length;
                 let doneCount = monthTasks.filter(item => item.done).length;
                 let percent = total === 0 ? 0 : Math.round((doneCount / total) * 100);
@@ -244,7 +266,6 @@
                 document.getElementById('doneCount').innerText = doneCount;
                 document.getElementById('percentText').innerText = percent + "%";
                 document.getElementById('progressBar').style.width = percent + "%";
-
                 updateMonthTitle(currentYearMonth);
             }
         }
@@ -258,12 +279,10 @@
         function summarizeTodayTasks() {
             let selectedDate = document.getElementById('taskDate').value;
             let todayDoneTasks = todoData.filter(item => item.date === selectedDate && item.done);
-
             if (todayDoneTasks.length === 0) {
-                alert("선택한 날짜에 완료(체크)된 할 일이 없습니다! 먼저 할 일을 끝내고 체크해 주세요.");
+                alert("완료(체크)된 할 일이 없습니다!");
                 return;
             }
-
             let taskSummary = todayDoneTasks.map(t => t.text).join(", ");
             document.getElementById('diaryContent').value = `오늘 완료한 공부: ${taskSummary}`;
         }
@@ -271,39 +290,30 @@
         function copyToClipboard() {
             let textarea = document.getElementById('diaryContent');
             let text = textarea.value.trim();
-
-            if (!text) {
-                alert("복사할 내용이 없습니다! 먼저 요약 버튼을 누르거나 텍스트를 입력해 주세요.");
-                return;
-            }
+            if (!text) { alert("복사할 내용이 없습니다!"); return; }
 
             if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(text).then(() => {
-                    alert("📋 클립보드에 복사되었습니다!");
-                });
+                navigator.clipboard.writeText(text).then(() => alert("📋 복사되었습니다!"));
             } else {
                 textarea.select();
                 document.execCommand('copy');
-                alert("📋 클립보드에 복사되었습니다!");
+                alert("📋 복사되었습니다!");
             }
         }
 
         function saveDiaryFeed() {
             let text = document.getElementById('diaryContent').value.trim();
             if(!text) { alert("일기 내용을 적어주세요!"); return; }
-
             let todayStr = document.getElementById('taskDate').value;
             diaryFeedData.unshift({ id: Date.now(), date: todayStr, content: text });
-
             localStorage.setItem('study_diaryFeedData', JSON.stringify(diaryFeedData));
-
             document.getElementById('diaryContent').value = "";
             renderDiaryFeed();
             alert("📸 공스타그램 피드에 저장되었습니다!");
         }
 
         function deleteDiaryFeed(id) {
-            if (confirm("이 피드 글을 삭제하시겠습니까?")) {
+            if (confirm("이 피드를 삭제하시겠습니까?")) {
                 diaryFeedData = diaryFeedData.filter(item => item.id !== id);
                 localStorage.setItem('study_diaryFeedData', JSON.stringify(diaryFeedData));
                 renderDiaryFeed();
@@ -313,8 +323,7 @@
         function editDiaryFeed(id) {
             let targetItem = diaryFeedData.find(item => item.id === id);
             if (!targetItem) return;
-
-            let newContent = prompt("수정할 피드 내용을 입력하세요:", targetItem.content);
+            let newContent = prompt("수정할 내용을 입력하세요:", targetItem.content);
             if (newContent !== null && newContent.trim() !== "") {
                 targetItem.content = newContent.trim();
                 localStorage.setItem('study_diaryFeedData', JSON.stringify(diaryFeedData));
@@ -325,7 +334,6 @@
         function renderDiaryFeed() {
             let feed = document.getElementById('diaryFeed');
             feed.innerHTML = "";
-
             diaryFeedData.forEach(item => {
                 let card = document.createElement('div');
                 card.className = 'diary-card';
@@ -342,60 +350,6 @@
                 feed.appendChild(card);
             });
         }
-
-        // 🔔 [매일 공부 알림 설정]
-        function saveNotificationSettings() {
-            let timeVal = document.getElementById('studyTime').value;
-
-            if (!timeVal) {
-                alert("알림을 받으실 시간을 설정해 주세요!");
-                return;
-            }
-
-            localStorage.setItem('study_time', timeVal);
-
-            if (!("Notification" in window)) {
-                alert("이 브라우저는 알림을 지원하지 않습니다.");
-                return;
-            }
-
-            Notification.requestPermission().then(permission => {
-                if (permission === "granted") {
-                    scheduleDailyNotification(timeVal);
-                    alert(`⏰ 매일 ${timeVal}에 공부 알림이 설정되었습니다!`);
-                } else {
-                    alert("알림 권한이 거부되었습니다. 아이폰 설정 > 웹앱 설정에서 알림을 허용해 주세요.");
-                }
-            });
-        }
-
-        function scheduleDailyNotification(timeStr) {
-            if (notificationTimer) clearInterval(notificationTimer);
-
-            notificationTimer = setInterval(() => {
-                let now = new Date();
-                let currentHours = String(now.getHours()).padStart(2, '0');
-                let currentMinutes = String(now.getMinutes()).padStart(2, '0');
-                let currentTimeStr = `${currentHours}:${currentMinutes}`;
-
-                if (currentTimeStr === timeStr && now.getSeconds() < 10) {
-                    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-                        navigator.serviceWorker.ready.then(registration => {
-                            registration.showNotification("📚 공부할 시간이에요!", {
-                                body: "오늘의 할 일을 확인하고 달성률을 올려보세요! 🔥",
-                                icon: "icon.png"
-                            });
-                        });
-                    } else {
-                        new Notification("📚 공부할 시간이에요!", {
-                            body: "오늘의 할 일을 확인하고 달성률을 올려보세요! 🔥",
-                            icon: "icon.png"
-                        });
-                    }
-                }
-            }, 10000);
-        }
     </script>
-
 </body>
 </html>
