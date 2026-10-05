@@ -1,7 +1,6 @@
 importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js');
 
-// index.html과 동일한 본인의 Firebase 설정값 입력
 const firebaseConfig = {
     apiKey: "AIzaSyB-L-gxBlvpYc30kRnTXs_TVtwdFnUE0o8",
     authDomain: "study-helper-2b9f6.firebaseapp.com",
@@ -14,9 +13,9 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-// 백그라운드 상태(탭이 닫혀있거나 다른 창을 보고 있을 때) 알림 수신
+// 백그라운드 수신 및 시스템 알림 생성
 messaging.onBackgroundMessage((payload) => {
-    console.log('[firebase-messaging-sw.js] 백그라운드 메시지 수신:', payload);
+    console.log('[sw.js] 백그라운드 메시지 수신:', payload);
     
     const notificationTitle = payload.notification?.title || "📚 공부할 시간입니다!";
     const notificationOptions = {
