@@ -196,6 +196,10 @@
             });
         }
 
+        messaging.onMessage((payload) => {
+    console.log('포그라운드 메시지 수신:', payload);
+    alert(`🔔 [${payload.notification.title}]\n${payload.notification.body}`);
+});
         function changeTab(tabId, clickedButton) {
             document.getElementById('todo').classList.remove('active');
             document.getElementById('diary').classList.remove('active');
