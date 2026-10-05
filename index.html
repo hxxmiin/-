@@ -121,18 +121,9 @@
         <!-- 3. 설정 탭 -->
         <div id="settings" class="tab-content">
             <h3>⚙ 알림 설정</h3>
-            <p>⏰ 복습 알림 시간</p>
+            <p>⏰ 매일 공부 알림 시간</p>
             <input type="time" id="studyTime"> 
-            
-            <p>🔄 복습 알림 주기</p>
-            <select id="reviewInterval">
-                <option value="1">매일 (1일마다)</option>
-                <option value="2">이틀마다 (2일 간격)</option>
-                <option value="3">3일마다</option>
-                <option value="7">일주일마다 (7일 간격)</option>
-                <option value="0">알림 끄기</option>
-            </select>
-            <button class="btn-primary" onclick="saveNotificationSettings()">설정 저장하기 및 알림 등록</button>
+            <button class="btn-primary" onclick="saveNotificationSettings()">알림 설정 저장하기</button>
         </div>
 
     </div>
@@ -185,9 +176,6 @@
 
             let savedTime = localStorage.getItem('study_time');
             if (savedTime) document.getElementById('studyTime').value = savedTime;
-
-            let savedInterval = localStorage.getItem('study_interval');
-            if (savedInterval) document.getElementById('reviewInterval').value = savedInterval;
         }
 
         function addTodo() {
@@ -355,17 +343,9 @@
             });
         }
 
-        // 🔔 [알림 설정 및 간격 관리]
+        // 🔔 [매일 공부 알림 설정]
         function saveNotificationSettings() {
             let timeVal = document.getElementById('studyTime').value;
-            let intervalVal = document.getElementById('reviewInterval').value;
-
-            if (intervalVal === "0") {
-                localStorage.setItem('study_interval', "0");
-                if (notificationTimer) clearInterval(notificationTimer);
-                alert("알림 설정이 해제되었습니다.");
-                return;
-            }
 
             if (!timeVal) {
                 alert("알림을 받으실 시간을 설정해 주세요!");
@@ -373,7 +353,6 @@
             }
 
             localStorage.setItem('study_time', timeVal);
-            localStorage.setItem('study_interval', intervalVal);
 
             if (!("Notification" in window)) {
                 alert("이 브라우저는 알림을 지원하지 않습니다.");
@@ -382,16 +361,15 @@
 
             Notification.requestPermission().then(permission => {
                 if (permission === "granted") {
-                    scheduleDailyNotification(timeVal, parseInt(intervalVal));
-                    let intervalText = intervalVal === "1" ? "매일" : `${intervalVal}일마다`;
-                    alert(`⏰ ${intervalText} ${timeVal}에 복습 알림이 설정되었습니다!`);
+                    scheduleDailyNotification(timeVal);
+                    alert(`⏰ 매일 ${timeVal}에 공부 알림이 설정되었습니다!`);
                 } else {
                     alert("알림 권한이 거부되었습니다. 아이폰 설정 > 웹앱 설정에서 알림을 허용해 주세요.");
                 }
             });
         }
 
-        function scheduleDailyNotification(timeStr, intervalDays) {
+        function scheduleDailyNotification(timeStr) {
             if (notificationTimer) clearInterval(notificationTimer);
 
             notificationTimer = setInterval(() => {
@@ -401,30 +379,16 @@
                 let currentTimeStr = `${currentHours}:${currentMinutes}`;
 
                 if (currentTimeStr === timeStr && now.getSeconds() < 10) {
-                    let lastNotifiedDate = localStorage.getItem('study_lastNotifiedDate');
-                    let todayStr = now.toISOString().substring(0, 10);
-
-                    if (lastNotifiedDate) {
-                        let lastDate = new Date(lastNotifiedDate);
-                        let diffTime = Math.abs(now - lastDate);
-                        let diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-                        if (diffDays < intervalDays) return; // 설정한 일수가 지나지 않았으면 발송 건너뜀
-                    }
-
-                    // 알림 발송 수행
-                    localStorage.setItem('study_lastNotifiedDate', todayStr);
-
                     if (navigator.serviceWorker && navigator.serviceWorker.controller) {
                         navigator.serviceWorker.ready.then(registration => {
-                            registration.showNotification("📚 복습할 시간이에요!", {
-                                body: "오늘의 복습 항목과 할 일을 확인해 보세요! 🔥",
+                            registration.showNotification("📚 공부할 시간이에요!", {
+                                body: "오늘의 할 일을 확인하고 달성률을 올려보세요! 🔥",
                                 icon: "icon.png"
                             });
                         });
                     } else {
-                        new Notification("📚 복습할 시간이에요!", {
-                            body: "오늘의 복습 항목과 할 일을 확인해 보세요! 🔥",
+                        new Notification("📚 공부할 시간이에요!", {
+                            body: "오늘의 할 일을 확인하고 달성률을 올려보세요! 🔥",
                             icon: "icon.png"
                         });
                     }
