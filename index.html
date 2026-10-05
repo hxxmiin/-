@@ -8,6 +8,7 @@
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="manifest" href="manifest.json" ignore-error>
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
     <!-- Firebase SDK 로드 -->
@@ -124,7 +125,7 @@
     </div>
 
     <script>
-        // 1. Firebase 설정 (Step 1에서 얻은 값 배치)
+        // 1. Firebase 설정 (Firebase 콘솔에서 본인의 실제 키 값으로 변경하세요)
         const firebaseConfig = {
             apiKey: "AIzaSyB-L-gxBlvpYc30kRnTXs_TVtwdFnUE0o8",
             authDomain: "study-helper-2b9f6.firebaseapp.com",
@@ -140,6 +141,7 @@
 
         let todoData = [];
         let diaryFeedData = [];
+        let swRegistration = null;
 
         window.onload = function() {
             let today = new Date().toISOString().substring(0, 10);
@@ -154,8 +156,12 @@
 
         function registerServiceWorker() {
             if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('firebase-messaging-sw.js')
-                .then(reg => console.log('Firebase SW 등록 성공:', reg))
+                // 상대 경로('./') 적용으로 GitHub Pages 저장소 경로(404 에러) 문제 방지
+                navigator.serviceWorker.register('./firebase-messaging-sw.js')
+                .then(reg => {
+                    console.log('Firebase SW 등록 성공:', reg);
+                    swRegistration = reg; // 서비스 워커 등록 객체 보관
+                })
                 .catch(err => console.log('Firebase SW 등록 실패:', err));
             }
         }
@@ -168,15 +174,21 @@
 
             Notification.requestPermission().then(permission => {
                 if (permission === 'granted') {
-                    messaging.getToken({ vapidKey: VAPID_KEY }).then((currentToken) => {
+                    // 서비스 워커 등록 정보를 명시적으로 전달하여 토큰 생성
+                    messaging.getToken({ 
+                        vapidKey: VAPID_KEY,
+                        serviceWorkerRegistration: swRegistration 
+                    }).then((currentToken) => {
                         if (currentToken) {
                             console.log('FCM Token:', currentToken);
-                            // 기기 토큰 저장은 필요시 로컬스토리지에 보관
                             localStorage.setItem('fcm_token', currentToken);
                             alert(`⏰ 매일 ${timeVal} 백그라운드 푸시 알림 설정 완료!`);
                         } else {
                             alert("토큰을 가져오지 못했습니다. VAPID 키를 확인해 주세요.");
                         }
+                    }).catch(err => {
+                        console.error("토큰 가져오기 실패:", err);
+                        alert("푸시 토큰 생성 실패. firebase-messaging-sw.js 파일 설정을 확인해 주세요.");
                     });
                 } else {
                     alert("알림 권한이 거부되었습니다.");
