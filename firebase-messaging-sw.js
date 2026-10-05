@@ -1,3 +1,4 @@
+// firebase-messaging-sw.js
 importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js');
 
@@ -13,7 +14,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-// 백그라운드 수신 및 시스템 알림 생성
+// 백그라운드 상태 수신
 messaging.onBackgroundMessage((payload) => {
     console.log('[sw.js] 백그라운드 메시지 수신:', payload);
     
